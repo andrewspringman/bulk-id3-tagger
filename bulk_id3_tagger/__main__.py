@@ -47,11 +47,25 @@ def _cmd_tag(args):
         return 1
 
     base_dir = os.path.abspath(args.base_dir) if args.base_dir else None
-    tagged, errors = tagger.apply_template(json_path, base_dir=base_dir)
 
-    print(f"Tagged {len(tagged)} file(s):")
-    for name in tagged:
-        print(f"  ✓ {name}")
+    try:
+        tagged, errors = tagger.apply_template(
+            json_path, base_dir=base_dir, dry_run=args.dry_run
+        )
+    except tagger.TaggerError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+
+    if args.dry_run:
+        print(f"\nDry run complete — {len(tagged)} track(s) would be tagged.")
+        if errors:
+            print(f"{len(errors)} error(s) found:")
+            for name, message in errors:
+                print(f"  ✗ {name}: {message}")
+            return 1
+        return 0
+
+    print(f"\nTagged {len(tagged)} file(s).")
 
     if errors:
         print(f"\n{len(errors)} error(s):")
@@ -79,6 +93,8 @@ def build_parser():
     tag = subparsers.add_parser("tag", help="write ID3 tags + artwork from a template JSON")
     tag.add_argument("template", help="path to a tags_template.json produced by `scan`")
     tag.add_argument("--base-dir", help="folder the audio/artwork files live in (default: the template's own folder)")
+    tag.add_argument("--dry-run", action="store_true",
+                     help="print what would be tagged for each track without writing any files")
     tag.set_defaults(func=_cmd_tag)
 
     return parser

@@ -62,15 +62,41 @@ individual track to override it just for that file). `artwork` paths are
 resolved relative to the folder the JSON lives in unless given as an
 absolute path.
 
-### 2. Apply the tags
+### 2. Preview the tags (dry run)
+
+Before writing anything, verify your JSON is correct:
+
+```bash
+bulk-id3-tagger tag ~/Music/my-release/tags_template.json --dry-run
+```
+
+This reads the JSON and prints what would be written for each track —
+title, artist, album, year, track number, and artwork path — without
+touching any audio files.
+
+### 3. Apply the tags
 
 ```bash
 bulk-id3-tagger tag ~/Music/my-release/tags_template.json
 ```
 
-This writes ID3 tags (and embeds the cover art) directly into each audio
-file listed in the template, and prints a summary of what succeeded and
-what failed.
+Before tagging begins, the tool validates the entire JSON and aborts if
+any of the following are found, listing **all** failures at once:
+
+- `track_number` values that are not numeric
+- `year` values that are not 4-digit numbers
+- `artwork` paths (in `defaults` or per-track) that do not resolve to an
+  existing file
+
+If validation passes, the tool tags each file and prints progress as it
+goes:
+
+```
+[1/22] Tagging: song-title.mp3
+[2/22] Tagging: another-song.mp3
+...
+Tagged 22 file(s).
+```
 
 ## Notes
 
@@ -78,6 +104,7 @@ what failed.
 - Artwork must be `.jpg`/`.jpeg` or `.png`.
 - Re-running `tag` is safe — it overwrites the relevant tag frames rather
   than duplicating them.
+- A bad artwork path is always a hard error (never silently skipped).
 
 ## License
 
