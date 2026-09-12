@@ -47,9 +47,15 @@ def _cmd_tag(args):
         return 1
 
     base_dir = os.path.abspath(args.base_dir) if args.base_dir else None
-    tagged, errors = tagger.apply_template(json_path, base_dir=base_dir)
+    dry_run = args.dry_run
 
-    print(f"Tagged {len(tagged)} file(s):")
+    tagged, errors = tagger.apply_template(json_path, base_dir=base_dir, dry_run=dry_run)
+
+    if dry_run:
+        print("[DRY RUN] No changes were written to files.")
+        print()
+
+    print(f"Would tag {len(tagged)} file(s):" if dry_run else f"Tagged {len(tagged)} file(s):")
     for name in tagged:
         print(f"  ✓ {name}")
 
@@ -79,6 +85,7 @@ def build_parser():
     tag = subparsers.add_parser("tag", help="write ID3 tags + artwork from a template JSON")
     tag.add_argument("template", help="path to a tags_template.json produced by `scan`")
     tag.add_argument("--base-dir", help="folder the audio/artwork files live in (default: the template's own folder)")
+    tag.add_argument("-n", "--dry-run", action="store_true", help="preview what would be tagged without writing changes")
     tag.set_defaults(func=_cmd_tag)
 
     return parser

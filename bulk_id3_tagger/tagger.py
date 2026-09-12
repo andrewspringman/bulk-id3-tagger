@@ -62,8 +62,17 @@ def _embed_artwork(tags, artwork_path):
 
 
 def tag_file(path, title="", artist="", album="", genre="", year="",
-             track_number=None, artwork=""):
-    """Write the given metadata + artwork into an audio file's ID3 tags."""
+             track_number=None, artwork="", dry_run=False):
+    """Write the given metadata + artwork into an audio file's ID3 tags.
+
+    If dry_run is True, validate everything but don't write changes.
+    """
+    # Validate file exists and is readable
+    if not os.path.isfile(path):
+        raise TaggerError(f"File not found: {path}")
+    if not os.access(path, os.R_OK):
+        raise TaggerError(f"File not readable: {path}")
+
     audio = _load_id3(path)
     tags = audio.tags
 
@@ -88,13 +97,25 @@ def tag_file(path, title="", artist="", album="", genre="", year="",
 
     _embed_artwork(tags, artwork)
 
-    audio.save()
+    # Only write if not a dry run
+    if not dry_run:
+        if not os.access(path, os.W_OK):
+            raise TaggerError(f"File not writable (permission denied): {path}")
+        audio.save()
 
 
-def apply_template(json_path, base_dir=None):
-    """Tag every file listed in a template JSON. Returns (tagged, errors)."""
-    with open(json_path, "r", encoding="utf-8") as f:
-        template = json.load(f)
+def apply_template(json_path, base_dir=None, dry_run=False):
+    """Tag every file listed in a template JSON. Returns (tagged, errors).
+
+    If dry_run is True, validate everything but don't write changes.
+    """
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            template = json.load(f)
+    except FileNotFoundError:
+        raise TaggerError(f"Template file not found: {json_path}")
+    except json.JSONDecodeError as exc:
+        raise TaggerError(f"Template JSON is invalid: {exc}")
 
     defaults = template.get("defaults", {})
     tracks = template.get("tracks", [])
@@ -106,7 +127,7 @@ def apply_template(json_path, base_dir=None):
     for track in tracks:
         filename = track.get("file")
         if not filename:
-            errors.append((track, "Track entry has no \"file\" field"))
+            errors.append((str(track), "Track entry has no \"file\" field"))
             continue
 
         path = os.path.join(base_dir, filename)
@@ -118,6 +139,11 @@ def apply_template(json_path, base_dir=None):
         if artwork and not os.path.isabs(artwork):
             artwork = os.path.join(base_dir, artwork)
 
+        # Validate artwork exists before attempting to tag
+        if artwork and not os.path.isfile(artwork):
+            errors.append((filename, f"Artwork file not found: {artwork}"))
+            continue
+
         try:
             tag_file(
                 path,
@@ -128,6 +154,7 @@ def apply_template(json_path, base_dir=None):
                 year=_resolve(track, defaults, "year"),
                 track_number=track.get("track_number"),
                 artwork=artwork,
+                dry_run=dry_run,
             )
             tagged.append(filename)
         except (TaggerError, ID3NoHeaderError, OSError) as exc:

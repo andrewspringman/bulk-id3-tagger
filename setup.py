@@ -8,10 +8,16 @@ setup(
     install_requires=[
         "mutagen>=1.47",
     ],
+    extras_require={
+        "dev": [
+            "pytest>=7.0",
+        ],
+    },
     entry_points={
         "console_scripts": [
             "bulk-id3-tagger=bulk_id3_tagger.__main__:main",
         ],
     },
     python_requires=">=3.8",
+    test_suite="tests",
 )
